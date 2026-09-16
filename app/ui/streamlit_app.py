@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 
 from app.analytics.anomaly_engine import anomaly_detector
 from app.analytics.kpi_engine import kpi_engine
+from app.analytics.semantic_engine import semantic_engine
 from app.database.db_manager import db_manager
 from app.ingestion.pipeline import ingestion_pipeline
 from app.nlp.llm_client import llm_client
@@ -40,39 +41,20 @@ st.markdown("""
         color: #64748B;
         margin-bottom: 1.5rem;
     }
-    .metric-card {
-        background-color: #F8FAFC;
-        border-radius: 8px;
-        padding: 16px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .metric-val {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #0F172A;
-    }
-    .metric-lbl {
-        font-size: 0.85rem;
-        color: #64748B;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    .badge-critical {
-        background-color: #FEE2E2;
-        color: #991B1B;
-        padding: 4px 8px;
+    .diag-box {
+        background-color: #F1F5F9;
+        border-left: 4px solid #3B82F6;
+        padding: 14px;
         border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.8rem;
+        margin-top: 10px;
     }
-    .badge-warning {
-        background-color: #FEF3C7;
-        color: #92400E;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.8rem;
+    .playbook-item {
+        background-color: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        font-size: 0.92rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -83,6 +65,7 @@ def init_app_state():
     db_manager.init_database()
     if db_manager.get_ticket_count() == 0:
         ingestion_pipeline.run()
+    semantic_engine.ensure_index()
     return True
 
 init_app_state()
@@ -117,7 +100,7 @@ with st.sidebar:
 
 # Top Header
 st.markdown('<div class="main-header">🛡️ Support Ticket Intelligence Platform</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Automated operational analytics, AI-powered Text-to-SQL querying, and statistical anomaly detection.</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Automated operational analytics, AI-powered Text-to-SQL querying, semantic issue discovery, and statistical anomaly detection.</div>', unsafe_allow_html=True)
 
 # Load Top KPIs
 kpis = kpi_engine.get_executive_summary()
@@ -136,10 +119,11 @@ with col5:
 
 st.write("")
 
-# Navigation Tabs
-tab_chat, tab_anomalies, tab_analytics, tab_explorer = st.tabs([
-    "💬 AI Assistant (Natural Language Q&A)",
-    "🚨 Anomaly Center & SLA Breaches",
+# Navigation Tabs (5 Tabs: Added Semantic Discovery)
+tab_chat, tab_anomalies, tab_semantic, tab_analytics, tab_explorer = st.tabs([
+    "💬 AI Assistant (Hybrid Text-to-SQL + Semantic)",
+    "🚨 Anomaly Center & AI Diagnostician",
+    "🧠 Semantic Discovery & Issue Clusters",
     "📈 Executive Dashboard",
     "🔍 Ticket Data Explorer"
 ])
@@ -149,9 +133,8 @@ tab_chat, tab_anomalies, tab_analytics, tab_explorer = st.tabs([
 # -------------------------------------------------------------
 with tab_chat:
     st.markdown("### Ask Natural Language Questions")
-    st.write("The AI system converts your business questions into safe SQL, executes it against the database, and returns concise answers with visual charts.")
+    st.write("Supports both **Structured Text-to-SQL Analytics** and **Qualitative Semantic Search** over support tickets.")
 
-    # Sample query chips
     st.markdown("**Sample Assessment Queries (Click to Run):**")
     chip_col1, chip_col2, chip_col3 = st.columns(3)
     chip_col4, chip_col5, chip_col6 = st.columns(3)
@@ -173,18 +156,17 @@ with tab_chat:
         if st.button("📌 Are there anomalies in resolution times?", use_container_width=True):
             sample_prompt = "Are there any anomalies in resolution times this week?"
     with chip_col6:
-        if st.button("📌 Which agent has lowest customer rating?", use_container_width=True):
-            sample_prompt = "Which agent has the lowest average customer rating?"
+        if st.button("📌 Find tickets related to login failure", use_container_width=True):
+            sample_prompt = "Find tickets related to login failure after update"
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Chat Input
-    user_query = st.chat_input("Type your question about support tickets (e.g., 'What is the resolution rate by priority?')...")
+    user_query = st.chat_input("Ask a quantitative or semantic question (e.g. 'What are the common issues?' or 'Average response time?')...")
     active_query = sample_prompt or user_query
 
     if active_query:
-        with st.spinner("Processing natural language query and executing SQL..."):
+        with st.spinner("Processing query and synthesizing intelligence..."):
             response = query_service.process_query(active_query)
             st.session_state.chat_history.append((active_query, response))
 
@@ -195,16 +177,13 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.markdown(res["answer"])
 
-            # Render generated SQL & Execution details
-            with st.expander(f"🔍 SQL & Execution Details ({res['execution_time_ms']} ms | {res['provider']})"):
+            with st.expander(f"🔍 Technical Inspection ({res['execution_time_ms']} ms | {res['provider']})"):
                 st.code(res["sql"], language="sql")
                 if res.get("error"):
                     st.error(f"Error: {res['error']}")
 
-            # Render Visualizations if data exists
             if res.get("data") and len(res["data"]) > 0:
                 df_res = pd.DataFrame(res["data"])
-                
                 if res["chart_type"] == "metric_card" and len(df_res.columns) == 1:
                     col_name = df_res.columns[0]
                     st.metric(label=col_name.replace("_", " ").title(), value=df_res.iloc[0, 0])
@@ -218,11 +197,11 @@ with tab_chat:
         st.divider()
 
 # -------------------------------------------------------------
-# TAB 2: Anomaly Center
+# TAB 2: Anomaly Center & AI Diagnostician
 # -------------------------------------------------------------
 with tab_anomalies:
-    st.markdown("### 🚨 Anomaly Detection & SLA Breach Monitor")
-    st.write("Detects operational SLA violations, delayed first responses, and statistical resolution time outliers using IQR and Z-scores.")
+    st.markdown("### 🚨 Anomaly Center & AI Root-Cause Diagnostician")
+    st.write("Identifies SLA violations, stalled escalations, and resolution outliers with deep AI diagnosis.")
 
     all_anomalies = anomaly_detector.detect_all()
     anom_df = pd.DataFrame(all_anomalies)
@@ -235,16 +214,16 @@ with tab_anomalies:
         with acol1:
             st.metric("Total Flagged Anomalies", len(all_anomalies))
         with acol2:
-            st.metric("Critical SLA Breaches", crit_count, delta="Requires Action", delta_color="inverse")
+            st.metric("Critical SLA Breaches", crit_count, delta="Action Required", delta_color="inverse")
         with acol3:
             st.metric("Statistical Outliers", warn_count)
         with acol4:
-            st.metric("Detection Methodology", "Hybrid (SLA Rules + IQR/Z-score)")
+            st.metric("Methodology", "Operational Rules + Tukey IQR & Z-score")
 
         st.divider()
 
         # Visual Outlier Chart
-        st.subheader("Resolution Time Distribution & Outliers")
+        st.subheader("Resolution Time Outlier Distribution")
         tickets_rows = db_manager.execute_query("""
             SELECT ticket_id, created_at, category, priority, status, resolution_time_hrs
             FROM support_tickets WHERE status = 'Resolved' AND resolution_time_hrs IS NOT NULL;
@@ -252,7 +231,6 @@ with tab_anomalies:
         tdf = pd.DataFrame(tickets_rows)
         if not tdf.empty:
             tdf["created_at"] = pd.to_datetime(tdf["created_at"])
-            # Outlier cutoff
             q3 = tdf["resolution_time_hrs"].quantile(0.75)
             iqr = q3 - tdf["resolution_time_hrs"].quantile(0.25)
             cutoff = q3 + (1.5 * iqr)
@@ -265,14 +243,46 @@ with tab_anomalies:
                 color="is_outlier",
                 color_discrete_map={True: "#EF4444", False: "#3B82F6"},
                 hover_data=["ticket_id", "category", "priority", "resolution_time_hrs"],
-                title=f"Resolution Times (IQR Outlier Threshold: {cutoff:.1f} hrs)",
+                title=f"Resolution Times (IQR Cutoff: {cutoff:.1f} hrs)",
                 labels={"created_at": "Ticket Date", "resolution_time_hrs": "Resolution Time (Hours)", "is_outlier": "Anomaly"}
             )
             fig.add_hline(y=cutoff, line_dash="dash", line_color="#EF4444", annotation_text=f"Anomaly Cutoff ({cutoff:.1f}h)")
             st.plotly_chart(fig, use_container_width=True)
 
-        # Filters
-        st.subheader("Flagged Tickets Roster")
+        st.divider()
+
+        # AI Root-Cause Diagnostic Tool
+        st.subheader("🤖 AI Root-Cause Diagnostician")
+        st.write("Select any ticket to generate an immediate diagnostic breakdown, peer comparison, and mitigation playbook.")
+        
+        ticket_options = anom_df["ticket_id"].tolist()
+        selected_ticket_id = st.selectbox("Select Ticket for Diagnosis:", ticket_options, index=0)
+        
+        if st.button(f"🔍 Run AI Diagnostic on {selected_ticket_id}", type="primary"):
+            diag = semantic_engine.diagnose_anomaly(selected_ticket_id)
+            with st.container():
+                st.markdown(f"#### Diagnostic Report: `{selected_ticket_id}` ({diag['priority']} Priority | {diag['category']})")
+                st.markdown(f'<div class="diag-box"><b>Findings:</b> {diag["diagnostic_summary"]}</div>', unsafe_allow_html=True)
+                
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    st.metric("Ticket Resolution Time", f"{diag['resolution_time_hrs']} hrs" if diag['resolution_time_hrs'] else "Unresolved")
+                with m2:
+                    st.metric("Category Benchmark", f"{diag['category_benchmark_resol_hrs']} hrs")
+                with m3:
+                    st.metric("Agent Benchmark", f"{diag['agent_benchmark_resol_hrs']} hrs")
+
+                st.markdown("**Actionable Remediation Playbook:**")
+                for action in diag["action_playbook"]:
+                    st.markdown(f'<div class="playbook-item">👉 {action}</div>', unsafe_allow_html=True)
+
+                if diag.get("similar_tickets"):
+                    st.write(f"**Similar Historical Incidents:** {', '.join(diag['similar_tickets'])}")
+
+        st.divider()
+
+        # Filtered Anomaly Table
+        st.subheader("Flagged Tickets Directory")
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             sev_filter = st.selectbox("Filter by Severity", ["All", "CRITICAL", "WARNING", "HIGH"])
@@ -285,7 +295,6 @@ with tab_anomalies:
         if type_filter != "All":
             filtered_anom = filtered_anom[filtered_anom["anomaly_type"] == type_filter]
 
-        st.write(f"Showing **{len(filtered_anom)}** flagged tickets:")
         st.dataframe(
             filtered_anom[[
                 "ticket_id", "severity", "anomaly_type", "priority", "category", 
@@ -295,7 +304,51 @@ with tab_anomalies:
         )
 
 # -------------------------------------------------------------
-# TAB 3: Executive Dashboard
+# TAB 3: Semantic Discovery & Issue Clustering (NEW ENTERPRISE FEATURE)
+# -------------------------------------------------------------
+with tab_semantic:
+    st.markdown("### 🧠 Semantic Discovery & Issue Clustering")
+    st.write("Unsupervised NLP grouping of support tickets into core issue topics using TF-IDF and K-Means vector modeling.")
+
+    # Topic Clusters
+    st.subheader("Discovered Problem Themes")
+    topics = semantic_engine.discover_topics(n_clusters=4)
+    tcols = st.columns(len(topics))
+    for idx, t in enumerate(topics):
+        with tcols[idx]:
+            st.markdown(f"**Topic {t['topic_id']} ({t['dominant_category']})**")
+            st.metric(label="Tickets in Cluster", value=t["ticket_count"])
+            st.write(f"⏱️ **Avg Resolution**: {t['avg_resolution_hrs']} hrs")
+            st.write(f"⭐ **Avg CSAT**: {t['avg_csat']} / 5.0")
+            st.caption(f"**Keywords**: {', '.join(t['keywords'])}")
+
+    st.divider()
+
+    # Semantic Vector Search
+    st.subheader("Semantic Symptom Search")
+    st.write("Find tickets semantically related to a description, even if exact keywords differ.")
+
+    s_col1, s_col2 = st.columns([3, 1])
+    with s_col1:
+        search_query = st.text_input("Enter issue symptom (e.g. 'charged wrong amount on invoice', 'system logout timeout', 'data export'):")
+    with s_col2:
+        cat_filter = st.selectbox("Filter Category", ["All", "Billing", "Technical", "General"])
+
+    if search_query:
+        category_param = None if cat_filter == "All" else cat_filter
+        matches = semantic_engine.search_similar(search_query, top_k=8, category=category_param)
+        if matches:
+            st.write(f"Found **{len(matches)}** semantically similar tickets:")
+            m_df = pd.DataFrame(matches)
+            st.dataframe(
+                m_df[["ticket_id", "similarity_score", "category", "priority", "status", "issue_summary"]],
+                use_container_width=True
+            )
+        else:
+            st.info("No matching tickets found for that symptom.")
+
+# -------------------------------------------------------------
+# TAB 4: Executive Dashboard
 # -------------------------------------------------------------
 with tab_analytics:
     st.markdown("### Executive Overview & Support Metrics")
@@ -321,7 +374,7 @@ with tab_analytics:
         st.dataframe(agent_df, use_container_width=True)
 
 # -------------------------------------------------------------
-# TAB 4: Ticket Data Explorer
+# TAB 5: Ticket Data Explorer
 # -------------------------------------------------------------
 with tab_explorer:
     st.markdown("### Interactive Ticket Explorer")
@@ -334,7 +387,7 @@ with tab_explorer:
     with ecol3:
         sel_stat = st.multiselect("Status", ["Open", "Resolved", "Escalated"], default=["Open", "Resolved", "Escalated"])
 
-    search_kw = st.text_input("Search issue summary keywords (e.g. 'refund', 'login', 'timeout'):")
+    search_kw = st.text_input("Search issue summary keywords:")
 
     all_tickets = db_manager.execute_query("""
         SELECT ticket_id, created_at, category, priority, status,

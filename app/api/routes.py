@@ -1,10 +1,11 @@
-"""REST API endpoints: /health, /api/query, /api/anomalies, /api/kpis, /api/tickets."""
+"""REST API endpoints with Semantic Search and AI Anomaly Diagnostician."""
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 
 from app.analytics.anomaly_engine import anomaly_detector
 from app.analytics.kpi_engine import kpi_engine
+from app.analytics.semantic_engine import semantic_engine
 from app.api.schemas import (
     QueryRequest,
     QueryResponse,
@@ -32,7 +33,7 @@ def health_check():
 
 @router.post("/api/query", response_model=QueryResponse, tags=["Natural Language AI"])
 def query_tickets(req: QueryRequest):
-    """Ask questions in natural language about tickets; generates and executes SQL."""
+    """Ask questions in natural language about tickets; supports Text-to-SQL and Semantic search."""
     try:
         result = query_service.process_query(req.query)
         return QueryResponse(**result)
@@ -56,6 +57,37 @@ def get_anomalies(
         warning_count=warning_count,
         anomalies=all_anomalies[:limit]
     )
+
+
+@router.get("/api/anomalies/{ticket_id}/diagnose", tags=["Anomaly Detection"])
+def diagnose_anomaly(
+    ticket_id: str = Path(..., description="Ticket ID e.g. TKT-108")
+):
+    """Deep AI root-cause diagnostic and remediation playbook for a flagged ticket."""
+    result = semantic_engine.diagnose_anomaly(ticket_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@router.get("/api/semantic/search", tags=["Semantic Intelligence"])
+def semantic_search(
+    q: str = Query(..., min_length=2, description="Search query or symptom e.g. 'login failure'"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    limit: int = Query(10, ge=1, le=50)
+):
+    """Find tickets semantically related to a description using TF-IDF & Cosine Similarity."""
+    matches = semantic_engine.search_similar(query=q, top_k=limit, category=category)
+    return {"query": q, "total_matches": len(matches), "results": matches}
+
+
+@router.get("/api/semantic/topics", tags=["Semantic Intelligence"])
+def get_issue_topics(
+    n_clusters: int = Query(4, ge=2, le=10, description="Number of issue clusters to extract")
+):
+    """Cluster ticket issue summaries into emerging problem themes using K-Means."""
+    topics = semantic_engine.discover_topics(n_clusters=n_clusters)
+    return {"total_clusters": len(topics), "topics": topics}
 
 
 @router.get("/api/kpis", tags=["Analytics"])
