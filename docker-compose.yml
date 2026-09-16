@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ticket-intelligence:
+    build: .
+    container_name: support-ticket-intelligence
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-auto}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
