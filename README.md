@@ -1,32 +1,27 @@
 # Support Ticket Intelligence AI
 
-An AI-powered customer support analytics system built for technical evaluation. It ingests 500 customer support ticket records into a queryable SQLite database, translates natural-language business questions into safe, executable SQL and semantic searches, automatically detects operational and statistical anomalies, and provides AI-assisted root-cause diagnosis. All capabilities are exposed through both a FastAPI REST API and an interactive Streamlit UI dashboard.
-
-*Built for: DOTMappers IT Pvt. Ltd. — End-to-End AI System Sprint (AI Engineer Role)*
+An AI-powered customer support analytics system built for the DOTMappers End-to-End AI System Sprint (AI Engineer Role). It ingests 500 ticket records into an indexed SQLite database, translates natural-language business questions into safe, executable SQL and semantic searches, detects operational and statistical anomalies, and provides automated root-cause diagnosis. All capabilities are accessible via a FastAPI REST API and an interactive Streamlit UI.
 
 ---
 
 ## Overview
 
-Customer support teams handle high ticket volumes where SLA breaches, response delays, and customer dissatisfaction often go unnoticed until escalations occur. This system provides visibility into support operations through conversational analytics and proactive anomaly detection.
-
-**System Workflows:**
-- **Natural-Language Querying:** `CSV` → Data Ingestion → SQLite Database → Natural-Language Query → LLM / Query Processing → Text-to-SQL or Semantic Search → Formatted Answer & Chart
-- **Anomaly Detection:** Ticket Data → Operational SLA Rules + Statistical Models (IQR & Z-Score) → Flagged Tickets → AI Root-Cause Diagnosis & Remediation Playbook
+Support operations frequently suffer from silent backlog accumulation, SLA breaches, and undetected customer dissatisfaction patterns. This system delivers operational visibility via conversational analytics, proactive anomaly detection, and semantic issue discovery over ticket data.
 
 ---
 
 ## Key Features
 
-- **CSV Ingestion & Storage:** Validates and loads 500 ticket records into an indexed SQLite database using Pydantic schemas.
-- **Natural-Language Querying:** Translates English business questions into SQLite queries with answer synthesis.
-- **LLM Integration:** Multi-provider support for Groq Cloud (`llama-3.3-70b-versatile`), local Ollama (`llama3`), and a local deterministic fallback engine.
-- **SQL Safety & Self-Healing:** Enforces read-only `SELECT` statements via AST/regex parsing, blocks DDL/DML, physically locks writes via SQLite `PRAGMA query_only = ON`, and auto-corrects syntax errors via error feedback.
-- **Semantic Search & Topic Discovery:** Uses TF-IDF and cosine similarity for qualitative symptom search, and MiniBatch K-Means to cluster tickets into emergent issue themes.
-- **Anomaly Detection & AI Diagnosis:** Flags operational SLA breaches (Critical > 12h, High > 24h) and statistical outliers (Tukey's IQR & Z-score), providing comparative benchmarks and remediation playbooks.
-- **Dual Interface:** Full FastAPI REST API (8 endpoints with OpenAPI Swagger docs) and an interactive 5-tab Streamlit dashboard.
-- **Zero-Cost & Local Execution:** Operates with zero paid API dependencies; includes an offline fallback engine ensuring the evaluator never faces broken runs.
-- **Testing & Deployment:** 17 unit/integration tests passing via `pytest`, one-click evaluator benchmark (`evaluate.py`), and containerized via Docker.
+- **CSV Ingestion & Storage:** Loads and validates 500 ticket records into SQLite with typed Pydantic schemas (`TicketRecord`).
+- **Natural Language Querying:** Translates questions into SQLite queries with answer synthesis.
+- **Multi-Provider LLM Support:** Groq Cloud (`llama-3.3-70b-versatile`), local Ollama (`llama3`), and a local deterministic fallback engine.
+- **Regex & Rule-Based SQL Guardrail:** Read-only `SELECT` enforcement, blocks DDL/DML, appends `LIMIT 100`, sets SQLite `PRAGMA query_only = ON`, and performs self-healing retry on syntax errors.
+- **Semantic Search & Topic Discovery:** Scikit-learn TF-IDF and cosine similarity for symptom discovery; MiniBatch K-Means for issue clustering.
+- **Anomaly Detection:** Flags operational SLA breaches (Critical > 12h, High > 24h, Stalled > 24h) and statistical outliers (Tukey IQR and Z-score > 2.5).
+- **Automated Root-Cause Diagnostician:** Deterministic benchmark comparison engine evaluating ticket resolution against category/agent averages, historical similarity matching, and remediation playbooks.
+- **Dual Interface:** 8 documented FastAPI REST endpoints with OpenAPI docs and a 5-tab interactive Streamlit dashboard.
+- **Zero-Cost Execution:** Operates 100% offline without API keys using the built-in deterministic fallback engine.
+- **Testing & Verification:** 17 unit/integration tests passing via `pytest` and a one-click automated benchmark scorecard (`evaluate.py`).
 
 ---
 
@@ -35,8 +30,8 @@ Customer support teams handle high ticket volumes where SLA breaches, response d
 ```mermaid
 flowchart TD
     User([User / Evaluator])
-    User -->|Browser| UI[Streamlit UI :8501]
-    User -->|HTTP / Swagger| API[FastAPI REST API :8000]
+    User -->|Browser :8501| UI[Streamlit UI Dashboard]
+    User -->|HTTP / Swagger :8000| API[FastAPI REST API]
 
     subgraph Service Layer
         UI --> QS[Query Service]
@@ -49,11 +44,11 @@ flowchart TD
 
     subgraph Intelligence & Processing
         QS --> LLM[LLM Client: Groq / Ollama / Fallback]
-        QS --> Guard[SQL Guard: Read-Only Validator]
-        Guard --> DBExec[(SQLite Database)]
-        SE --> VectorIdx[TF-IDF Index & K-Means Clusters]
+        QS --> Guard[SQL Guard: Regex & Rule Guardrail]
+        Guard --> DBExec[(SQLite Database: PRAGMA query_only)]
+        SE --> VectorIdx[TF-IDF In-Memory Matrix & K-Means]
         AD --> DBExec
-        AD --> Diagnostician[AI Anomaly Diagnostician]
+        AD --> Diagnostician[Automated Diagnostic Engine]
     end
 
     subgraph Data Store
@@ -63,10 +58,10 @@ flowchart TD
 ```
 
 ### Architectural Rationale
-- **Embedded SQLite (WAL Mode):** Eliminates external database infrastructure, guarantees zero setup friction for evaluators, and delivers sub-2ms analytical query speed over 500 rows.
-- **Text-to-SQL + AST Guard:** SQL produces deterministic, transparent, and auditable arithmetic for quantitative metrics, while the security guard prevents destructive queries.
-- **Hybrid Semantic Layer:** While SQL handles quantitative aggregations, TF-IDF and K-Means handle unstructured text in `issue_summary` for symptom search and cluster discovery.
-- **FastAPI + Streamlit:** FastAPI provides typed, asynchronous, machine-to-machine REST endpoints, while Streamlit delivers an interactive human-in-the-loop dashboard.
+- **Embedded SQLite (WAL Mode):** Delivers zero-setup portability, atomic transactions, and sub-2ms query speeds over 500 rows.
+- **Regex & Rule-Based SQL Guardrail:** Enforces query safety before execution; SQLite `PRAGMA query_only = ON` prevents engine-level writes.
+- **Hybrid Semantic Layer:** SQL executes quantitative aggregations; Scikit-learn TF-IDF & K-Means analyze unstructured `issue_summary` text.
+- **FastAPI + Streamlit:** FastAPI offers typed programmatic endpoints; Streamlit provides an exploratory visual interface.
 
 ---
 
@@ -74,16 +69,16 @@ flowchart TD
 
 | Component | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Language** | Python 3.10+ / 3.11 | Core runtime environment |
-| **Database** | SQLite 3 (WAL mode) | Embedded data store with B-tree indexes and analytical views |
-| **REST API** | FastAPI + Uvicorn | Asynchronous web service with automatic OpenAPI documentation |
-| **Web UI** | Streamlit + Plotly | 5-tab interactive analytics dashboard with charts |
-| **Data Validation** | Pydantic v2 | Schema validation for ingestion and API request/response models |
-| **LLM Inference** | Groq API (`llama-3.3-70b-versatile`) / Ollama (`llama3`) | Natural language understanding and Text-to-SQL generation |
-| **Local Fallback Engine** | Custom Semantic Rule Engine | Zero-dependency local query resolver for instant offline evaluation |
-| **NLP & Clustering** | Scikit-learn (TF-IDF, K-Means) | Qualitative symptom search and unsupervised topic discovery |
+| **Runtime** | Python 3.10+ / 3.11 | Core runtime environment |
+| **Database** | SQLite 3 (WAL mode) | Embedded data store with 6 B-Tree indexes and 2 analytical views |
+| **REST API** | FastAPI + Uvicorn | Asynchronous REST service with interactive OpenAPI documentation |
+| **Web UI** | Streamlit + Plotly | 5-tab analytical dashboard with interactive visualizations |
+| **Validation** | Pydantic v2 | Data validation for CSV ingestion and API schemas |
+| **LLM Inference** | Groq Cloud (`llama-3.3-70b-versatile`) / Ollama (`llama3`) | Natural language understanding and Text-to-SQL generation |
+| **Fallback Engine** | Deterministic Rule-Based Engine | Local zero-dependency query translation ensuring offline reliability |
+| **NLP & Clustering** | Scikit-learn (TF-IDF, MiniBatch K-Means) | Qualitative symptom search and unsupervised topic discovery |
 | **Testing** | Pytest + HTTPX | Automated test suite (17 tests) |
-| **Deployment** | Docker & Docker Compose | Containerized single-command execution |
+| **Deployment** | Docker & Docker Compose | Single-stage containerized execution |
 
 ---
 
@@ -93,79 +88,149 @@ flowchart TD
 support-ticket-intelligence/
 ├── app/
 │   ├── config.py             # Settings, thresholds, and provider configurations
-│   ├── main.py               # FastAPI entrypoint with startup lifecycle
+│   ├── main.py               # FastAPI entrypoint with startup lifespan ingestion
 │   ├── analytics/            # Anomaly engine (IQR/Z-score/SLA), KPI engine, Semantic TF-IDF engine
-│   ├── api/                  # FastAPI routes (/health, /query, /anomalies, /semantic) & Pydantic schemas
+│   ├── api/                  # 8 REST endpoints (/health, /query, /anomalies, etc.) & Pydantic schemas
 │   ├── database/             # SQLite connection manager (PRAGMA query_only) and DDL schema/views
 │   ├── ingestion/            # CSV validation pipeline and Pydantic TicketRecord schema
-│   ├── nlp/                  # LLM client (Groq/Ollama/Fallback), SQL guard, prompt templates, query router
-│   └── ui/                   # Streamlit 5-tab executive dashboard
+│   ├── nlp/                  # LLM client (Groq/Ollama/Fallback), regex SQL guard, query orchestrator
+│   └── ui/                   # Streamlit 5-tab interactive dashboard
 ├── data/
-│   ├── support_tickets.csv   # Source dataset (500 tickets)
-│   └── tickets.db            # SQLite database with indexes & views
-├── tests/                    # 17 automated tests (anomalies, API, ingestion, NLP/SQL guard, semantic)
-├── Dockerfile                # Multi-stage container definition
-├── docker-compose.yml        # Compose configuration for API and UI
+│   ├── support_tickets.csv   # Source dataset (500 tickets, Jan-Mar 2024)
+│   └── tickets.db            # SQLite database with indexes & analytical views
+├── tests/                    # 17 automated tests (ingestion, SQL guard, queries, anomalies, semantics, API)
+├── Dockerfile                # Single-stage container definition for API & UI
+├── docker-compose.yml        # Docker Compose configuration for containerized deployment
 ├── evaluate.py               # One-click evaluator benchmark scorecard
 ├── requirements.txt          # Pinned Python dependencies
-└── run.py                    # Single-command launcher for API & UI
+└── run.py                    # Single-command unified launcher for API & UI
 ```
 
 ---
 
-## Quickstart Guide
+## Setup
 
-### 1. Setup Environment
 ```bash
-git clone <repo-url>
+git clone https://github.com/VortexQuasarX/support-ticket-intelligence.git
 cd support-ticket-intelligence
 python -m venv venv
-source venv/bin/activate    # On Windows: .\venv\Scripts\activate
+source venv/bin/activate    # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
-*(Optional: add `GROQ_API_KEY=gsk_...` to `.env` to enable Groq Cloud LLaMA 3.3 70B; otherwise runs offline fallback at zero cost).*
-
-### 2. Run Evaluator Benchmark & Tests
-```bash
-python evaluate.py          # One-click benchmark scorecard (< 5 seconds)
-pytest tests -v             # Run all 17 automated unit and integration tests
-```
-
-### 3. Launch System (Single Command)
-Launches both FastAPI and Streamlit concurrently:
-```bash
-python run.py
-```
-- **Streamlit UI Dashboard:** [http://localhost:8501](http://localhost:8501)
-- **FastAPI REST API & Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-*(Alternative: `docker-compose up`)*
 
 ---
 
-## REST API Endpoints
+## Configuration
 
-| Method | Endpoint | Description | Example Query / Body |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | System status, DB connectivity, ticket count, active LLM | `curl http://localhost:8000/health` |
-| `POST` | `/api/query` | Natural-language query (Text-to-SQL + Semantic) | `{"query": "How many tickets are currently open?"}` |
-| `GET` | `/api/anomalies` | Flagged SLA breaches and statistical outliers | `curl "http://localhost:8000/api/anomalies?limit=10"` |
-| `GET` | `/api/anomalies/{id}/diagnose` | AI root-cause diagnosis & remediation playbook | `curl http://localhost:8000/api/anomalies/TKT-108/diagnose` |
-| `GET` | `/api/semantic/search` | Vector similarity search over ticket summaries | `curl "http://localhost:8000/api/semantic/search?q=login+failure"` |
-| `GET` | `/api/semantic/topics` | K-Means clustering of emergent problem themes | `curl http://localhost:8000/api/semantic/topics?n_clusters=4` |
-| `GET` | `/api/kpis` | Executive summary (CSAT, resolution rates, agent stats) | `curl http://localhost:8000/api/kpis` |
-| `GET` | `/api/tickets` | Filterable ticket explorer (status, priority, category) | `curl "http://localhost:8000/api/tickets?priority=Critical"` |
+Settings are configured via `.env` (template in `.env.example`):
+- `GROQ_API_KEY`: Optional Groq key for `llama-3.3-70b-versatile`.
+- `OLLAMA_HOST` & `OLLAMA_MODEL`: Optional local Ollama endpoint (default: `http://localhost:11434`, `llama3`).
+- `LLM_PROVIDER`: `auto` (Groq → Ollama → Fallback) | `groq` | `ollama` | `fallback`.
+- `SLA_CRITICAL_HOURS`: Critical SLA threshold in hours (default: `12.0`).
+- `SLA_HIGH_HOURS`: High priority SLA threshold in hours (default: `24.0`).
+- `MAX_RESPONSE_TIME_THRESHOLD`: Maximum first response delay in hours (default: `4.0`).
+
+*(Note: Runs out-of-the-box in zero-cost fallback mode with no API keys required).*
 
 ---
 
-## Sample Queries & Verified Outputs
+## Running the System
 
-Below are the verified outputs for the queries specified in the assessment brief:
+```bash
+python run.py          # Primary single command: launches FastAPI (:8000) & Streamlit (:8501)
+python run.py --api    # Launches FastAPI REST API only
+python run.py --ui     # Launches Streamlit UI only
+docker-compose up      # Containerized deployment
+```
+- **Streamlit UI:** [http://localhost:8501](http://localhost:8501)
+- **FastAPI OpenAPI Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-| Section | Query | Generated SQL / Method | Verified System Output | Latency |
+---
+
+## How It Works
+
+1. **Ingestion:** On startup, `IngestionPipeline` validates all 500 CSV rows using Pydantic `TicketRecord` and populates `support_tickets` in `data/tickets.db`.
+2. **Intent Classification:** `QueryService` detects whether the prompt is qualitative/semantic or quantitative/analytical.
+3. **Execution & Guardrails:**
+   - Quantitative queries pass to `LLMClient.generate_sql()`.
+   - `SQLGuard` sanitizes and validates SQL via regex.
+   - Query runs in SQLite under `PRAGMA query_only = ON;`.
+   - On error, `LLMClient.fix_sql()` performs self-healing retry.
+   - `LLMClient.synthesize_answer()` generates a concise natural-language response.
+
+---
+
+## Natural Language Querying
+
+- **Dual Translation Engine:** Leverages Groq (`llama-3.3-70b-versatile`) or Ollama (`llama3`) when available, and falls back to a deterministic semantic regex engine offline.
+- **SQL Security Guardrails:** Only allows `SELECT`/`WITH`, blocks DDL/DML keywords, blocks internal `sqlite_` metadata, and appends `LIMIT 100` to unbound queries.
+- **Self-Healing Loop:** Automatically captures SQLite syntax error messages and queries the LLM for self-correction before failing.
+
+---
+
+## Anomaly Detection
+
+Implemented in `app/analytics/anomaly_engine.py`:
+- **Operational Rules:**
+  - `SLA_BREACH_CRITICAL`: Unresolved Critical tickets open > 12h.
+  - `SLA_BREACH_HIGH`: Unresolved High tickets open > 24h.
+  - `STALLED_ESCALATION`: Escalated tickets pending > 24h.
+  - `FIRST_RESPONSE_DELAY`: Critical/High initial response > 4h.
+- **Statistical Modeling:**
+  - `RESOLUTION_TIME_OUTLIER`: Flags resolved tickets where resolution exceeds Tukey IQR cutoff (Q3 + 1.5 * IQR) or Z-score > 2.5.
+  - `LOW_CSAT_SURPRISE`: Flags tickets with rating <= 2 despite turnaround < 6h.
+- **Dataset Results:** Identifies **153 anomalies** across the 500-ticket dataset (91 Critical SLA breaches, 62 Warning/High statistical outliers).
+- **Automated Root-Cause Diagnostician:** Uses deterministic benchmark comparison rules (comparing ticket duration against category and agent averages), TF-IDF historical similarity search, and action playbook formulation.
+
+---
+
+## Semantic Search & Topic Discovery
+
+- **Symptom Vector Search:** Uses Scikit-learn `TfidfVectorizer(ngram_range=(1, 2), max_features=1000)` and cosine similarity to find tickets semantically matching issue descriptions (e.g., *"login failure after update"*).
+- **Emergent Topic Discovery:** Uses `MiniBatchKMeans(n_clusters=4)` to cluster ticket issue summaries, surfacing top keywords, dominant categories, average resolution times, and CSAT scores per theme.
+
+---
+
+## REST API
+
+8 endpoints implemented in `app/api/routes.py`:
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | System health, DB connectivity, ticket count, active LLM |
+| `POST` | `/api/query` | Natural-language query processing (Text-to-SQL + Semantic) |
+| `GET` | `/api/anomalies` | Flagged SLA breaches and statistical outliers with severity filters |
+| `GET` | `/api/anomalies/{ticket_id}/diagnose` | Automated root-cause diagnostic report and remediation playbook |
+| `GET` | `/api/semantic/search` | TF-IDF vector similarity search over ticket summaries |
+| `GET` | `/api/semantic/topics` | K-Means clustering of emergent problem themes |
+| `GET` | `/api/kpis` | Executive summary KPIs, resolution rates, and agent leaderboard |
+| `GET` | `/api/tickets` | Filterable raw ticket explorer with pagination |
+
+---
+
+## Streamlit UI
+
+The dashboard (`app/ui/streamlit_app.py`) provides 5 dedicated tabs:
+1. **💬 AI Assistant:** Conversational query interface with 6 clickable sample buttons, SQL inspection expander, latency metrics, and dynamic Plotly charts.
+2. **🚨 Anomaly Center:** Resolution time outlier scatter plot with IQR cutoff line, interactive ticket diagnostician selector, and filterable anomaly directory.
+3. **🧠 Semantic Discovery:** Discovered topic theme cards with cluster metrics and semantic symptom search.
+4. **📈 Executive Dashboard:** Tickets by Category donut chart, Priority bar chart, and Support Agent Leaderboard.
+5. **🔍 Ticket Data Explorer:** Multi-select filtering (Category, Priority, Status), keyword search, and CSV download.
+
+---
+
+## Example Queries & Outputs
+
+> [!NOTE]
+> **Historical Dataset Anchor:** The dataset spans `2024-01-01` to `2024-03-30`. In accordance with standard data evaluation practices for historical corpora:
+> - *"This month"* refers to **March 2024** (`2024-03`).
+> - *"This week"* refers to the final 7-day window anchored to `MAX(created_at)` (`2024-03-24` to `2024-03-30`).
+
+| Section | Assessment Query | Generated SQL / Method | Verified System Output | Latency |
 | :--- | :--- | :--- | :--- | :---: |
 | **Sec 2** | *"How many critical tickets are unresolved?"* | `SELECT COUNT(*) ... WHERE priority = 'Critical' AND status IN ('Open', 'Escalated')` | **31** unresolved critical tickets | ~2 ms |
 | **Sec 2** | *"Which agent has the lowest average customer rating?"* | `SELECT agent_id, ROUND(AVG(customer_rating), 2) ... GROUP BY agent_id ORDER BY avg_rating ASC LIMIT 1` | Agent **AGT-08** (Rating: **3.48 / 5.0**) | ~2 ms |
-| **Sec 2** | *"Show unresolved high-priority tickets older than 24 hours"* | `SELECT ... WHERE priority = 'High' AND status IN ('Open', 'Escalated') AND elapsed > 24` | **49** tickets flagged (e.g., TKT-233, TKT-301) | ~2 ms |
+| **Sec 2** | *"Show unresolved high-priority tickets older than 24 hours"* | `SELECT ... WHERE priority = 'High' AND status IN ('Open', 'Escalated') AND hours_open > 24` | **49** tickets flagged (e.g., TKT-233, TKT-301) | ~2 ms |
 | **Sec 9** | *"How many tickets are currently open?"* | `SELECT COUNT(*) FROM support_tickets WHERE status = 'Open'` | **111** open tickets | ~2 ms |
 | **Sec 9** | *"Which agent resolved the most tickets this month?"* | `SELECT agent_id, COUNT(*) ... WHERE strftime('%Y-%m', created_at) = '2024-03'` | Agent **AGT-01** (**16 tickets** in March 2024) | ~2 ms |
 | **Sec 9** | *"Show me all Critical tickets not resolved within 12 hours."* | `SELECT ... WHERE priority = 'Critical' AND (status IN ('Open', 'Escalated') OR resolution_time_hrs > 12.0)` | **34** tickets exceeding 12h SLA | ~2 ms |
@@ -174,9 +239,71 @@ Below are the verified outputs for the queries specified in the assessment brief
 
 ---
 
-## Known Limitations & Mitigations
+## Testing
 
-1. **Historical Dataset Anchor:** The dataset spans `2024-01-01` to `2024-03-30`. Relative time filters (e.g., "older than 24 hours", "this week") anchor to `MAX(created_at)` from the dataset rather than wall-clock `CURRENT_TIMESTAMP` to ensure deterministic evaluation. In a live system, this connects to UTC system time.
-2. **Single-Table Schema Scope:** The Text-to-SQL prompt and security guard are tuned for the support ticket schema. Scaling to enterprise schemas with dozens of tables would require dynamic schema pruning via vector search.
-3. **Sparse vs. Dense Embeddings:** Semantic search utilizes TF-IDF and n-grams for fast, zero-dependency local execution. While effective for support terminology, dense neural embeddings (`sentence-transformers`) would provide richer conceptual synonym matching.
-4. **SQLite Write Concurrency:** SQLite handles concurrent reads via WAL mode, but serializes writes. Suitable for analytical prototypes, but high-throughput ingestion (> 5,000 writes/sec) would warrant PostgreSQL or ClickHouse.
+### Automated Test Suite (`pytest`)
+Run all 17 unit and integration tests:
+```bash
+pytest -v
+```
+**Test Breakdown (17/17 Passed in ~7.0s):**
+- `tests/test_ingestion.py` (3 tests): DB initialization, CSV ingestion, null-semantics integrity.
+- `tests/test_nlp_sql.py` (3 tests): SQL security guardrail blocking destructive queries, safe SELECT checks, sample queries.
+- `tests/test_anomalies.py` (3 tests): Anomaly engine execution, SLA breach flagging, statistical outlier identification.
+- `tests/test_semantic.py` (4 tests): Semantic search, K-Means clustering, diagnostic engine output, hybrid routing.
+- `tests/test_api.py` (4 tests): Endpoint contracts for `/health`, `/api/query`, `/api/anomalies`, and `/api/kpis`.
+
+### Automated Evaluator Benchmark (`evaluate.py`)
+```bash
+python evaluate.py
+```
+- Verifies 500-ticket database ingestion.
+- Benchmarks all 8 required assessment queries with latencies.
+- Validates anomaly detection counts (153 total, 91 critical, 62 statistical).
+- Verifies semantic search and K-Means topic clusters.
+- Tests automated anomaly diagnosis on ticket `TKT-108`.
+- Result: **100% Compliance, 8/8 Queries Passed in ~3.99s.**
+
+---
+
+## Assessment Requirement Coverage
+
+| Assessment Requirement | Status | Implementation Evidence |
+| :--- | :---: | :--- |
+| **CSV Ingestion** | **MET** | `app/ingestion/pipeline.py` validates 500 rows via Pydantic and loads into SQLite table `support_tickets`. |
+| **Natural-Language Querying** | **MET** | `app/nlp/query_service.py` handles Text-to-SQL translation with self-healing and answer synthesis. |
+| **Anomaly Detection** | **MET** | `app/analytics/anomaly_engine.py` implements SLA operational rules + Tukey IQR & Z-score models. |
+| **REST API** | **MET** | `app/api/routes.py` exposes 8 REST endpoints with auto-generated OpenAPI Swagger docs at `/docs`. |
+| **User Interface** | **MET** | `app/ui/streamlit_app.py` delivers a 5-tab dashboard with charts, query assistant, and diagnostic tool. |
+| **LLM Usage** | **MET** | `app/nlp/llm_client.py` integrates Groq API (`llama-3.3-70b-versatile`) and local Ollama (`llama3`). |
+| **Zero-Cost Local Execution** | **MET** | Deterministic semantic fallback engine runs 100% offline without API keys or external services. |
+| **Single-Command Startup** | **MET** | `python run.py` launches both FastAPI (:8000) and Streamlit (:8501) concurrently. |
+| **Requirements File** | **MET** | `requirements.txt` specifies all 12 pinned dependencies. |
+| **README Documentation** | **MET** | Complete setup, architecture, schema, sample queries, and limitations documented. |
+
+---
+
+## Known Limitations
+
+1. **Historical Dataset Anchor:** The dataset spans `2024-01-01` to `2024-03-30`. Relative time filters (e.g., "this month", "this week") anchor to `MAX(created_at)` from the dataset rather than wall-clock `CURRENT_TIMESTAMP` to ensure deterministic evaluation.
+2. **Single-Table Schema Scope:** The SQL prompt and regex security guard are optimized for the single-table support ticket schema. Multi-table enterprise schemas would benefit from dynamic schema pruning via embeddings.
+3. **In-Memory TF-IDF Representation:** Semantic search uses Scikit-learn TF-IDF and n-grams for fast, zero-dependency local execution. Dense neural embeddings (`sentence-transformers`) would provide deeper semantic synonym generalization.
+4. **SQLite Concurrency:** SQLite handles concurrent reads via WAL mode, but serializes write transactions. High-throughput streaming ingestion (> 5,000 writes/sec) would warrant PostgreSQL or ClickHouse.
+
+---
+
+## Future Improvements
+
+- **Database Scaling:** Migrate SQLite to PostgreSQL with connection pooling for multi-user write concurrency.
+- **Dense Vector Search:** Integrate Qdrant or Milvus with dense neural embeddings for multi-lingual semantic matching.
+- **Async Job Processing:** Implement Celery or Redis Queue for asynchronous anomaly recalculation and batch ingestion.
+- **LLM Narrative Diagnostics:** Extend the diagnostic engine with LLM-generated narrative summaries alongside deterministic benchmark comparisons.
+
+---
+
+## Submission
+
+- **Repository Link:** [https://github.com/VortexQuasarX/support-ticket-intelligence](https://github.com/VortexQuasarX/support-ticket-intelligence)
+- **Primary Branch:** `main`
+- **Submission Recipient:** `RajathKumar@dotmappers.in`
+- **Candidate Presentation:** Prepared for the 30-minute technical walkthrough covering architecture, live UI/API demonstration, test suite, and design decisions.
