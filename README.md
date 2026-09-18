@@ -9,6 +9,7 @@
 ## 📑 Table of Contents
 - [Executive Overview](#-executive-overview)
 - [System Architecture](#-system-architecture)
+- [Models & Tools Used](#-models--tools-used)
 - [Key Engineering Decisions & Rationale](#-key-engineering-decisions--rationale)
 - [Multi-Tier Anomaly Detection & AI Diagnostician](#-multi-tier-anomaly-detection--ai-diagnostician)
 - [Hybrid Query Engine (Text-to-SQL + Semantic RAG)](#-hybrid-query-engine-text-to-sql--semantic-rag)
@@ -17,6 +18,7 @@
 - [Assessment Sample Queries & Verified Outputs](#-assessment-sample-queries--verified-outputs)
 - [REST API Specification](#-rest-api-specification)
 - [Automated Test Suite (17 Tests)](#-automated-test-suite-17-tests)
+- [Known Limitations & Mitigations](#-known-limitations--mitigations)
 - [Production Scaling Roadmap (Walkthrough Discussion)](#-production-scaling-roadmap-walkthrough-discussion)
 
 ---
@@ -92,6 +94,22 @@ flowchart TD
         Synthesizer --> Streamlit
     end
 ```
+
+---
+
+## 🛠️ Models & Tools Used
+
+| Layer / Category | Tool / Model | Purpose |
+| :--- | :--- | :--- |
+| **Language** | Python 3.10+ / 3.11 | Core runtime environment |
+| **LLM Inference** | LLaMA 3.3 70B (Groq Free Tier) / LLaMA 3 (Ollama) | Zero-cost natural language understanding & Text-to-SQL generation |
+| **Offline LLM Engine** | Custom Semantic Fallback Engine | Deterministic, zero-dependency local query resolver for instant offline evaluation |
+| **Vector Modeling** | Scikit-Learn (TF-IDF & K-Means) | Semantic search & unsupervised issue clustering over unstructured summaries |
+| **Database Engine** | SQLite 3 with WAL Mode & B-Tree Indexes | Ultra-fast embedded analytical query store (< 2ms per query) |
+| **API Framework** | FastAPI + Uvicorn + Pydantic v2 | High-performance asynchronous REST API with OpenAPI Swagger documentation |
+| **Frontend UI** | Streamlit + Plotly Express | Interactive 5-tab dashboard with data visualization and AI diagnostics |
+| **Validation & Testing** | Pytest + HTTPX TestClient | Comprehensive automated testing suite (17 passing tests) |
+| **Containerization** | Docker & Docker Compose | Multi-platform single-command deployment |
 
 ---
 
@@ -185,63 +203,22 @@ Reviewers can verify the entire system's functionality and performance with a si
 python evaluate.py
 ```
 
-### Output Preview:
-```text
-===========================================================================
-  DOTMAPPERS AI ENGINEER ASSESSMENT - VERIFICATION BENCHMARK
-===========================================================================
-
-[1/5] Verifying Data Ingestion Layer...
-  [PASS] Database Status: OK (500/500 tickets verified in SQLite)
-
-===========================================================================
-  2/5 BENCHMARKING REQUIRED ASSESSMENT QUERIES (SECTION 9)
-===========================================================================
-#   | Query Description                          | Latency   | Status
----------------------------------------------------------------------------
-1   | Count of open status tickets               |    2.3 ms | [PASS]
-2   | Top resolving agent for March 2024         |    2.5 ms | [PASS]
-3   | Tickets exceeding 12h resolution SLA       |    1.8 ms | [PASS]
-4   | Technical category CSAT score              |    1.7 ms | [PASS]
-5   | Statistical resolution time outliers       |    1.7 ms | [PASS]
-
-===========================================================================
-  3/5 VERIFYING ANOMALY DETECTION ENGINE
-===========================================================================
-  [PASS] Total Flagged Anomalies: 153
-  [PASS] Critical SLA Breaches:   91 (Immediate escalation flags)
-  [PASS] Statistical Outliers:    62 (IQR & Z-score resolution delays)
-
-===========================================================================
-  4/5 VERIFYING SEMANTIC TEXT SEARCH & TOPIC DISCOVERY
-===========================================================================
-  [PASS] Semantic Query: 'login failure password' (cosine similarity: 0.775)
-  [PASS] Discovered 3 Problem Clusters via K-Means
-  [PASS] AI Anomaly Diagnostic on TKT-108 (5.9x category benchmark)
-
-===========================================================================
-  FINAL EVALUATION SCORECARD
-===========================================================================
-  • Assessment Requirements Compliance: 100% (All 4 Core Requirements Met)
-  • Sample Queries Verification:        PASS (5/5 Correct)
-  • Average Query Latency:              < 3.0 ms
-  • Active AI Provider:                 Deterministic Semantic Fallback Engine (Zero-Cost / Local)
-===========================================================================
-```
-
 ---
 
 ## 📊 Assessment Sample Queries & Verified Outputs
 
-Below are the exact sample queries from Section 9 of the assessment brief with verified results:
+Below are the exact sample queries from both Section 2 and Section 9 of the assessment brief with verified results:
 
-| Sample Query from Brief | Generated SQL | Verified Output | Execution Latency |
-| :--- | :--- | :--- | :--- |
-| **"How many tickets are currently open?"** | `SELECT COUNT(*) AS open_tickets_count FROM support_tickets WHERE status = 'Open' LIMIT 100` | The Open Tickets Count is **111**. | **2.3 ms** |
-| **"Which agent resolved the most tickets this month?"** | `SELECT agent_id, COUNT(*) AS tickets_resolved FROM support_tickets WHERE status = 'Resolved' AND strftime('%Y-%m', created_at) = '2024-03' GROUP BY agent_id ORDER BY tickets_resolved DESC LIMIT 1` | Agent **AGT-01** resolved the most tickets (16 tickets) during this period. | **2.5 ms** |
-| **"Show me all Critical tickets not resolved within 12 hours."** | `SELECT ticket_id, category, priority, status, response_time_hrs, resolution_time_hrs, agent_id, issue_summary FROM support_tickets WHERE priority = 'Critical' AND (status IN ('Open', 'Escalated') OR resolution_time_hrs > 12.0) ORDER BY resolution_time_hrs DESC LIMIT 100` | Found **34 tickets** matching criteria (e.g. TKT-255, TKT-446, TKT-238). | **1.8 ms** |
-| **"What is the average customer rating for Technical category tickets?"** | `SELECT category, ROUND(AVG(customer_rating), 2) AS avg_customer_rating, COUNT(*) AS resolved_count FROM support_tickets WHERE category = 'Technical' AND customer_rating IS NOT NULL LIMIT 100` | The average customer rating for **Technical** category tickets is **3.74 out of 5.0**. | **1.7 ms** |
-| **"Are there any anomalies in resolution times this week?"** | `SELECT ticket_id, category, priority, status, resolution_time_hrs, agent_id, issue_summary FROM support_tickets WHERE status = 'Resolved' AND resolution_time_hrs > 40.0 ORDER BY resolution_time_hrs DESC LIMIT 10` | Found **10 tickets** with extreme resolution delays (up to 119.7 hours). | **1.7 ms** |
+| Source | Sample Query from Brief | Generated SQL | Verified Output | Execution Latency |
+| :--- | :--- | :--- | :--- | :--- |
+| **Section 2** | *"How many critical tickets are unresolved?"* | `SELECT COUNT(*) AS unresolved_critical_tickets FROM support_tickets WHERE priority = 'Critical' AND status IN ('Open', 'Escalated') LIMIT 100` | The Unresolved Critical Tickets is **31**. | **2.2 ms** |
+| **Section 2** | *"Which agent has the lowest average customer rating?"* | `SELECT agent_id, ROUND(AVG(customer_rating), 2) AS avg_rating, COUNT(*) AS rated_tickets FROM support_tickets WHERE customer_rating IS NOT NULL GROUP BY agent_id ORDER BY avg_rating ASC LIMIT 1` | Agent **AGT-08** has an average customer rating of **3.48 / 5.0**. | **2.4 ms** |
+| **Section 2** | *"Show unresolved high-priority tickets older than 24 hours"* | `SELECT ticket_id, created_at, priority, status, agent_id, issue_summary FROM support_tickets WHERE priority = 'High' AND status IN ('Open', 'Escalated') AND (julianday((SELECT MAX(created_at) FROM support_tickets)) - julianday(created_at)) * 24 > 24 ORDER BY created_at DESC LIMIT 100` | Found **49 tickets** matching criteria (e.g. TKT-233, TKT-301). | **2.8 ms** |
+| **Section 9** | *"How many tickets are currently open?"* | `SELECT COUNT(*) AS open_tickets_count FROM support_tickets WHERE status = 'Open' LIMIT 100` | The Open Tickets Count is **111**. | **2.3 ms** |
+| **Section 9** | *"Which agent resolved the most tickets this month?"* | `SELECT agent_id, COUNT(*) AS tickets_resolved FROM support_tickets WHERE status = 'Resolved' AND strftime('%Y-%m', created_at) = '2024-03' GROUP BY agent_id ORDER BY tickets_resolved DESC LIMIT 1` | Agent **AGT-01** resolved the most tickets (**16 tickets**) during March 2024. | **2.5 ms** |
+| **Section 9** | *"Show me all Critical tickets not resolved within 12 hours."* | `SELECT ticket_id, category, priority, status, response_time_hrs, resolution_time_hrs, agent_id, issue_summary FROM support_tickets WHERE priority = 'Critical' AND (status IN ('Open', 'Escalated') OR resolution_time_hrs > 12.0) ORDER BY resolution_time_hrs DESC LIMIT 100` | Found **34 tickets** exceeding 12h resolution SLA. | **1.8 ms** |
+| **Section 9** | *"What is the average customer rating for Technical category tickets?"* | `SELECT category, ROUND(AVG(customer_rating), 2) AS avg_customer_rating, COUNT(*) AS resolved_count FROM support_tickets WHERE category = 'Technical' AND customer_rating IS NOT NULL LIMIT 100` | The average customer rating for **Technical** category tickets is **3.74 out of 5.0**. | **1.7 ms** |
+| **Section 9** | *"Are there any anomalies in resolution times this week?"* | `SELECT ticket_id, category, priority, status, resolution_time_hrs, agent_id, issue_summary FROM support_tickets WHERE status = 'Resolved' AND resolution_time_hrs > 40.0 ORDER BY resolution_time_hrs DESC LIMIT 10` | Found **10 tickets** with extreme resolution delays (up to 119.7 hours). | **1.7 ms** |
 
 ---
 
@@ -253,7 +230,9 @@ Returns service health, database status, ticket volume, and active LLM provider.
 ### 2. `POST /api/query`
 Natural language query endpoint (handles both Text-to-SQL and Semantic search).
 ```bash
-curl -X POST http://localhost:8000/api/query      -H "Content-Type: application/json"      -d '{"query": "How many tickets are currently open?"}'
+curl -X POST http://localhost:8000/api/query \
+     -H "Content-Type: application/json" \
+     -d '{"query": "How many critical tickets are unresolved?"}'
 ```
 
 ### 3. `GET /api/anomalies`
@@ -294,6 +273,25 @@ pytest tests -v
 
 ---
 
+## ⚠️ Known Limitations & Mitigations
+
+As required by Section 4 of the technical assessment brief, below are the identified system limitations and their architectural mitigations:
+
+1. **Dataset Temporal Horizon (Historical vs. Live Time)**:
+   - *Limitation*: The provided dataset spans January 1, 2024 to March 30, 2024. If relative SLA queries (e.g. *"tickets open > 24 hours"*) were computed against current wall-clock time (`CURRENT_TIMESTAMP`), all open tickets would appear thousands of hours overdue.
+   - *Mitigation*: The system anchors relative time calculations to `MAX(created_at)` from the dataset (`2024-03-30 18:06:00`), ensuring realistic operational analytics. In production, this anchors to live UTC system time.
+2. **Schema Scale Boundaries for Text-to-SQL**:
+   - *Limitation*: Standard few-shot LLM prompts work exceptionally well on single tables and moderate relational schemas, but degrade when an enterprise schema spans hundreds of tables.
+   - *Mitigation*: We implemented the `SQLGuard` AST validator and a closed-loop self-correction retry mechanism. For massive multi-table scale, schema pruning via vector search over table DDLs is recommended.
+3. **Sparse vs. Dense Vector Semantic Embeddings**:
+   - *Limitation*: The semantic search engine utilizes TF-IDF and n-grams for zero-dependency, sub-millisecond local execution without requiring downloading gigabyte-sized neural embedding models. While highly effective for technical support terms ("login", "timeout", "billing", "invoice"), it does not capture complex conceptual synonyms as richly as dense neural models.
+   - *Mitigation*: The architecture decouples the vectorizer, enabling drop-in replacement with dense embedding models (`sentence-transformers/all-MiniLM-L6-v2`) when neural accelerators are available.
+4. **SQLite Concurrency Throughput**:
+   - *Limitation*: SQLite handles unlimited concurrent read operations smoothly using WAL mode, but serializes write operations.
+   - *Mitigation*: Perfectly suited for analytical Q&A over 500+ records. In high-concurrency enterprise write environments (> 10,000 ingestions/sec), the database layer should be pointed to PostgreSQL or ClickHouse.
+
+---
+
 ## 🚀 Production Scaling Roadmap (Walkthrough Discussion)
 
 For the 30-minute post-submission architecture walkthrough, here are the production evolution pathways:
@@ -316,4 +314,5 @@ For the 30-minute post-submission architecture walkthrough, here are the product
 - **Company**: DOTMappers IT Pvt. Ltd.
 - **Author**: Candidate Submission
 - **Email Submission**: `RajathKumar@dotmappers.in`
+- **Subject**: `[AI Engineer Assessment] – <Your Name>`
 - **License**: MIT
