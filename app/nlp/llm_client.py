@@ -262,6 +262,14 @@ class LLMClient:
 
         # Section 9 Query: "Are there any anomalies in resolution times this week / general?"
         if "anomal" in text and ("resolution" in text or "time" in text):
+            if "week" in text:
+                return (
+                    "SELECT ticket_id, created_at, category, priority, status, resolution_time_hrs, agent_id, issue_summary "
+                    "FROM support_tickets "
+                    "WHERE status = 'Resolved' AND resolution_time_hrs > 40.0 "
+                    "  AND created_at >= (SELECT datetime(MAX(created_at), '-7 days') FROM support_tickets) "
+                    "ORDER BY resolution_time_hrs DESC;"
+                )
             return (
                 "SELECT ticket_id, category, priority, status, resolution_time_hrs, agent_id, issue_summary "
                 "FROM support_tickets "
