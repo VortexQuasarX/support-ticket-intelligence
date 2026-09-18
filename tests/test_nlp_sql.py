@@ -30,13 +30,19 @@ def test_sql_guard_allows_safe_selects():
 
 
 def test_sample_assessment_queries():
+    # Covers all queries from both Section 2 and Section 9 of the assessment brief
     test_cases = [
-        ("How many tickets are currently open?", 111),
+        ("How many critical tickets are unresolved?", "31"),
+        ("Which agent has the lowest average customer rating?", "AGT-08"),
+        ("How many tickets are currently open?", "111"),
         ("Which agent resolved the most tickets this month?", "AGT-01"),
-        ("What is the average customer rating for Technical category tickets?", 3.74)
+        ("Show me all Critical tickets not resolved within 12 hours.", "34"),
+        ("What is the average customer rating for Technical category tickets?", "3.74"),
+        ("Are there any anomalies in resolution times this week?", "TKT-108")
     ]
     for prompt, expected_val in test_cases:
         res = query_service.process_query(prompt)
-        assert res["success"] is True
-        assert res["row_count"] >= 1
-        assert str(expected_val) in str(res["data"]) or str(expected_val) in res["answer"]
+        assert res["success"] is True, f"Failed on query: {prompt}"
+        assert res["row_count"] >= 1, f"No rows returned for: {prompt}"
+        matched = (expected_val in str(res["data"])) or (expected_val in res["answer"])
+        assert matched, f"Expected {expected_val} in result for query: '{prompt}'. Got: {res['answer']}"
